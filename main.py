@@ -2,7 +2,7 @@ import datetime
 import os
 from abc import ABC
 from dataclasses import dataclass, fields
-from enum import Enum
+from enum import IntEnum
 from typing import Literal, get_args, Iterator, Generic, TypeVar
 
 from dotenv import load_dotenv
@@ -58,7 +58,7 @@ class TimeColumn(BaseColumn):
 class ClassColumn(BaseColumn):
     @property
     def is_available(self) -> list[bool]:
-        return [False if status.startswith(self._filter) else True for status in self.text]
+        ...
 
 
 class BasePage(ABC):
@@ -82,28 +82,28 @@ class BasePage(ABC):
 
 @dataclass
 class Passenger(Generic[T]):
-    adult: T = 1
-    elder: T = 0
-    child: T = 0
-    severe_disabled: T = 0
-    mild_disabled: T = 0
+    adult: T
+    elder: T
+    child: T
+    severe_disabled: T
+    mild_disabled: T
 
     def __iter__(self) -> Iterator[T]:
         return (getattr(self, field.name) for field in fields(self))
 
 
-class SeatLocation(Enum):
-    default: int = 0
-    single_seat: int = 1
-    window_seat: int = 2
-    aisle_seat: int = 3
+class SeatLocation(IntEnum):
+    default = 0
+    single_seat = 1
+    window_seat = 2
+    aisle_seat = 3
 
 
-class SeatAttribute(Enum):
-    default: int = 0
-    normal: int = 1
-    wheelchair: int = 2
-    electric_wheelchair: int = 3
+class SeatAttribute(IntEnum):
+    default = 0
+    normal = 1
+    wheelchair = 2
+    electric_wheelchair = 3
 
 
 class LoginPage(BasePage):
@@ -199,7 +199,7 @@ class SelectSchedulePage(BasePage):
 
 
 @dataclass
-class RoomOptions:
+class PriorityOptions:
     standard: int = HIGH
     first_class: int = LOW
     standard_standing: int = LOW
@@ -223,7 +223,7 @@ class TimeTable:
     FIRST_CLS_IDX = 5
     STANDARD_CLS_IDX = 6
 
-    def __init__(self, table_elem: WebElement, room_options: RoomOptions):
+    def __init__(self, table_elem: WebElement, priority_options: PriorityOptions):
         _row_elems = [row_elem for row_elem in table_elem.find_elements(By.TAG_NAME, "tr")]
 
     def _get_columns(self) -> list:
@@ -231,20 +231,24 @@ class TimeTable:
 
 
 class AutoReserver:
-    def __init__(self, driver: Chrome, room_options: RoomOptions):
+    def __init__(self, driver: Chrome, room_options: PriorityOptions):
         self._driver = driver
         _table_body_xpath = "//tbody"
         _tbody_elem = self._driver.find_element(By.XPATH, _table_body_xpath)
         self._time_table = TimeTable(_tbody_elem, room_options.standard, room_options.first_class)
 
     def run(self):
-        
+        ...
 
 
 if __name__ == "__main__":
     load_dotenv()
     ID = os.getenv("ID")
+    if ID is None:
+        raise OSError
     PW = os.getenv("PW")
+    if PW is None:
+        raise OSError
 
     driver_options = Options()
     driver_options.add_argument("headless")
@@ -256,19 +260,19 @@ if __name__ == "__main__":
     DEPARTURE: Region = "수서"
     DESTINATION: Region = "부산"
     DATETIME = datetime.datetime(2024, 7, 19, 15, 30)
-    PASSENGER_COUNT = Passenger(adult=1, elder=3, child=3)
+    PASSENGER_COUNT = Passenger[int](adult=1, elder=3, child=3)
     select_schedule_page = SelectSchedulePage(driver)
     select_schedule_page.enter_region(DEPARTURE, DESTINATION)
     select_schedule_page.select_date_time(DATETIME)
     select_schedule_page.select_passenger(PASSENGER_COUNT)
     select_schedule_page.select_seat_type(SeatLocation.window_seat, SeatAttribute.default)
     select_schedule_page.search()
-    room_option = RoomOptions(standard=VERY_HIGH,
-                              first_class=DISABLE,
-                              standard_standing=DISABLE,
-                              first_class_standing=DISABLE,
-                              allow_standing=False
-                              )
+    room_option = PriorityOptions(standard=VERY_HIGH,
+                                  first_class=DISABLE,
+                                  standard_standing=DISABLE,
+                                  first_class_standing=DISABLE,
+                                  allow_standing=False
+                                  )
 
     auto_reserver = AutoReserver(driver, room_options=room_option)
 

@@ -1,47 +1,28 @@
 import datetime
-from dataclasses import dataclass
+import os
+from abc import ABC
+from dataclasses import dataclass, fields
 from enum import Enum
-from typing import Literal, get_args, Iterator
+from typing import Literal, get_args, Iterator, Generic, TypeVar
+
+from dotenv import load_dotenv
+from selenium.webdriver import Chrome
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import Select as SeleniumSelect
-from abc import ABC
-from selenium.webdriver import Chrome
-import os
-from dotenv import load_dotenv
-import pandas as pd
 
 
+T = TypeVar("T")
+VERY_HIGH: int = 4
+HIGH: int = 3
+MEDIUM: int = 2
+LOW: int = 1
+DISABLE: int = 0
 SRT_LOGIN_PAGE_URL = r"https://etk.srail.kr/cmc/01/selectLoginForm.do?pageId=TK0701000000"
 SRT_SELECT_SCHEDULE_PAGE_URL = r"https://etk.srail.kr/hpg/hra/01/selectScheduleList.do?pageId=TK0101010000"
 SRT_MAIN_URL = r"https://etk.srail.kr/main.do"
 Region = Literal["수서", "동탄", "평택지제", "천안아산", "오송", "대전", "김천구미", "동대구", "서대구", "경주", "울산(통도사)", "울산", "부산"]
-
-
-@dataclass
-class PassengerCount:
-    adult: int = 0
-    elder: int = 0
-    child: int = 0
-    severe_disabled: int = 0
-    mild_disabled: int = 0
-
-    def __iter__(self) -> Iterator[int]:
-        return iter([self.adult, self.elder, self.child, self.severe_disabled, self.mild_disabled])
-
-
-class SeatLocation(Enum):
-    default: int = 0
-    single_seat: int = 1
-    window_seat: int = 2
-    aisle_seat: int = 3
-
-
-class SeatAttr(Enum):
-    default: int = 0
-    normal: int = 1
-    wheelchair: int = 2
-    electric_wheelchair: int = 3
 
 
 class Select(SeleniumSelect):
@@ -52,6 +33,32 @@ class Select(SeleniumSelect):
     @property
     def text_options(self) -> list[str]:
         return [elem.text for elem in self.options]
+
+
+class BaseColumn(ABC):
+    def __init__(self, col_elems: list[WebElement]):
+        self._col_elems = col_elems
+
+    @property
+    def text(self) -> list[str]:
+        return [elem.text for elem in self._col_elems]
+
+
+class TimeColumn(BaseColumn):
+    @property
+    def time(self) -> list[datetime.time]:
+        times = []
+        for text in self.text:
+            time_str = text.split("\n")[1]
+            time_obj = datetime.datetime.strptime(time_str, "%H:%M").time()
+            times.append(time_obj)
+        return times
+
+
+class ClassColumn(BaseColumn):
+    @property
+    def is_available(self) -> list[bool]:
+        return [False if status.startswith(self._filter) else True for status in self.text]
 
 
 class BasePage(ABC):
@@ -71,6 +78,32 @@ class BasePage(ABC):
     def _get_select(self, xpath: str):
         elem = self._driver.find_element(By.XPATH, xpath)
         return Select(elem)
+
+
+@dataclass
+class Passenger(Generic[T]):
+    adult: T = 1
+    elder: T = 0
+    child: T = 0
+    severe_disabled: T = 0
+    mild_disabled: T = 0
+
+    def __iter__(self) -> Iterator[T]:
+        return (getattr(self, field.name) for field in fields(self))
+
+
+class SeatLocation(Enum):
+    default: int = 0
+    single_seat: int = 1
+    window_seat: int = 2
+    aisle_seat: int = 3
+
+
+class SeatAttribute(Enum):
+    default: int = 0
+    normal: int = 1
+    wheelchair: int = 2
+    electric_wheelchair: int = 3
 
 
 class LoginPage(BasePage):
@@ -105,24 +138,23 @@ class SelectSchedulePage(BasePage):
         _dst_input_box_xpath = "//*[@id='arvRsStnCdNm']"
         self._dst_input_box = self._driver.find_element(By.XPATH, _dst_input_box_xpath)
         self._dst_input_box.clear()
-        
+
         _date_select_xpath = "//*[@id='dptDt']"
         self._date_select = self._get_select(_date_select_xpath)
         _time_select_xpath = "//*[@id='dptTm']"
         self._time_select = self._get_select(_time_select_xpath)
-        
+
         _adult_select_xpath = "//select[@name='psgInfoPerPrnb1']"
         _children_select_xpath = "//select[@name='psgInfoPerPrnb5']"
         _elder_select_xpath = "//select[@name='psgInfoPerPrnb4']"
         _severe_select_xpath = "//select[@title='중증장애인 인원수 선택']"
         _mild_select_xpath = "//select[@title='경증장애인 인원수 선택']"
-        self._passenger_selects = {
-            "adult": self._get_select(_adult_select_xpath),
-            "child": self._get_select(_children_select_xpath),
-            "elder": self._get_select(_elder_select_xpath),
-            "severe_disabled": self._get_select(_severe_select_xpath),
-            "mild_disabled": self._get_select(_mild_select_xpath),
-        }
+        self._passenger_selects = Passenger(self._get_select(_adult_select_xpath),
+                                            self._get_select(_children_select_xpath),
+                                            self._get_select(_elder_select_xpath),
+                                            self._get_select(_severe_select_xpath),
+                                            self._get_select(_mild_select_xpath),
+                                            )
 
         _seat_location_xpath = "//select[@title='좌석위치 선택']"
         _seat_attr_xpath = "//select[@title='좌석속성 선택']"
@@ -151,47 +183,61 @@ class SelectSchedulePage(BasePage):
         time_idx = time_list.index(f"{dep_time:02d}")
         self._time_select.select_by_index(time_idx)
 
-    def select_passenger(self, person_count: PassengerCount):
-        for key, count in zip(self._passenger_selects.keys(), person_count):
-            if count > 9:
-                raise ValueError(f"{key} count cannot be more than 9.")
-            self._passenger_selects[key].select_by_index(count)
+    def select_passenger(self, pessanger_count: Passenger[int]) -> None:
+        for cnt, select in zip(pessanger_count, self._passenger_selects):
+            if cnt > 9:
+                raise ValueError
+            select.select_by_index(cnt)
 
     def select_seat_type(self, location: SeatLocation = SeatLocation.default,
-                         attribute: SeatAttr = SeatAttr.default):
+                         attribute: SeatAttribute = SeatAttribute.default):
         self.seat_loc_select.select_by_index(location.value)
         self.seat_attr_select.select_by_index(attribute.value)
 
     def search(self):
         self._search_button.click()
 
-class TableColumn:
-    ...
+
+@dataclass
+class RoomOptions:
+    standard: int = HIGH
+    first_class: int = LOW
+    standard_standing: int = LOW
+    first_class_standing: int = LOW
+    allow_standing: bool = False
+
+    def __post_init__(self):
+        if not any([getattr(self, field.name) for field in fields(self)]):
+            raise ValueError
+        if self.allow_standing:
+            self.standard_standing = DISABLE
+            self.first_class_standing = DISABLE
+        if self.standard == DISABLE:
+            self.standard_standing = DISABLE
+        if self.first_class == DISABLE:
+            self.first_class_standing = DISABLE
+
+
+class TimeTable:
+    DEP_IDX = 3
+    FIRST_CLS_IDX = 5
+    STANDARD_CLS_IDX = 6
+
+    def __init__(self, table_elem: WebElement, room_options: RoomOptions):
+        _row_elems = [row_elem for row_elem in table_elem.find_elements(By.TAG_NAME, "tr")]
+
+    def _get_columns(self) -> list:
+        ...
 
 
 class AutoReserver:
-    DEP_IDX = 3
-    FIRST_CLS_IDX = 5
-    NORMAL_CLS_IDX = 6
-
-    def __init__(self, driver: Chrome, allow_stand: bool = True):
+    def __init__(self, driver: Chrome, room_options: RoomOptions):
         self._driver = driver
-        # _dep_col_xpath = "/html/body/div/div[4]/div/div[3]/div[1]/form/fieldset/div[6]/table/colgroup/col[4]"
-        # self.dep_col_elems = self._driver.find_elements(By.XPATH, _dep_col_xpath)
-        # _first_cls_col_xpath = "/html/body/div/div[4]/div/div[3]/div[1]/form/fieldset/div[6]/table/colgroup/col[6]"
-        # self.first_cls_col_elems = self._driver.find_elements(By.XPATH, _first_cls_col_xpath)
-        # _normal_cls_col_xpath = "/html/body/div/div[4]/div/div[3]/div[1]/form/fieldset/div[6]/table/colgroup/col[7]"
-        # self.normal_col_cls_elems = self._driver.find_elements(By.XPATH, _normal_cls_col_xpath)
         _table_body_xpath = "//tbody"
-        self._tbody_elem = self._driver.find_element(By.XPATH, _table_body_xpath)
-        self._row_elems = [row_elem for row_elem in self._tbody_elem.find_elements(By.TAG_NAME, "tr")]
+        _tbody_elem = self._driver.find_element(By.XPATH, _table_body_xpath)
+        self._time_table = TimeTable(_tbody_elem, room_options.standard, room_options.first_class)
 
-        ...
-
-
-    def _get_table(self) -> pd.DataFrame:
-        table_elem = self._driver.find_element(By.XPATH, self._table_xpath)
-        ...
+    def run(self):
         
 
 
@@ -200,26 +246,32 @@ if __name__ == "__main__":
     ID = os.getenv("ID")
     PW = os.getenv("PW")
 
-    driver = Chrome()
+    driver_options = Options()
+    driver_options.add_argument("headless")
+    driver = Chrome(options=driver_options)
+
     login_page = LoginPage(driver)
     login_page.login(ID, PW)
 
     DEPARTURE: Region = "수서"
     DESTINATION: Region = "부산"
     DATETIME = datetime.datetime(2024, 7, 19, 15, 30)
-    PASSENGER_COUNT = PassengerCount(adult=1, elder=3, child=3)
+    PASSENGER_COUNT = Passenger(adult=1, elder=3, child=3)
     select_schedule_page = SelectSchedulePage(driver)
     select_schedule_page.enter_region(DEPARTURE, DESTINATION)
     select_schedule_page.select_date_time(DATETIME)
     select_schedule_page.select_passenger(PASSENGER_COUNT)
-    select_schedule_page.select_seat_type(SeatLocation.window_seat, SeatAttr.default)
+    select_schedule_page.select_seat_type(SeatLocation.window_seat, SeatAttribute.default)
     select_schedule_page.search()
-    auto_reserver = AutoReserver(driver)
-    df = auto_reserver._get_table()
-    
+    room_option = RoomOptions(standard=VERY_HIGH,
+                              first_class=DISABLE,
+                              standard_standing=DISABLE,
+                              first_class_standing=DISABLE,
+                              allow_standing=False
+                              )
+
+    auto_reserver = AutoReserver(driver, room_options=room_option)
 
     # TODO:
     input("Press Enter to close the browser and end the script...")
     print("Done")
-
-

@@ -1,0 +1,9 @@
+{
+    "python.analysis.typeCheckingMode": "basic",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "flake8.args": [
+        "--max-line-length=120"
+    ],
+    "python.analysis.autoImportCompletions": true,
+}

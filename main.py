@@ -7,7 +7,7 @@ from typing import Generic, Iterator, Literal, TypeVar, get_args
 
 import pandas as pd
 from dotenv import load_dotenv
-from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import Chrome
@@ -19,6 +19,8 @@ import time
 
 
 T = TypeVar("T")
+POP_UP_VISIBLE_EXPLICIT_WAIT_TIME = 3
+POP_UP_INVISIBLE_EXPLICIT_WAIT_TIME = 10
 VERY_HIGH: int = 4
 HIGH: int = 3
 MEDIUM: int = 2
@@ -192,12 +194,19 @@ class SelectSchedulePage(BasePage):
     def search(self):
         self._search_button.click()
         popup_xpath = "//*[@id=\"NetFunnel_Loading_Popup\"]"
-        print("ㅋ")
         try:
-            self._driver.find_element(By.XPATH, popup_xpath)
-            time.sleep(10)
-        except NoSuchElementException:
-            ...
+            # 요소가 나타날 때까지 대기
+            popup_xpath = "//*[@id=\"NetFunnel_Loading_Popup\"]"
+            WebDriverWait(driver, POP_UP_VISIBLE_EXPLICIT_WAIT_TIME).until(
+                EC.presence_of_element_located((By.XPATH, popup_xpath))
+            )
+            # 요소가 사라질 때까지 대기
+            WebDriverWait(driver, POP_UP_INVISIBLE_EXPLICIT_WAIT_TIME).until(
+                EC.invisibility_of_element((By.XPATH, popup_xpath))
+            )
+        except:
+            pass
+
 
 @dataclass
 class ClassPriorityOptions:
@@ -247,15 +256,16 @@ class TimePriorityOptions:
 
 
 class TicketingPage(BasePage):
-    def __init__(self, driver: Chrome, url: str = SRT_SELECT_SCHEDULE_PAGE_URL):
+    def __init__(self, driver: Chrome, url: str = SRT_TICKETING_PAGE_URL):
         BasePage.__init__(self, driver)
-        self._driver.get(url)
+        self._url = url
 
     def validate(self):
-        status_msg = self._driver.find_element(By.XPATH, "//*[@id=\"list-form\"]/fieldset/div[2]").text
-        if status_msg == "예약된 내역이 없습니다":
+        self._driver.get(self._url)
+        try:
+            self._driver.find_element(By.XPATH, "//*[@id=\"list-form\"]/fieldset/div[2]")
             return False
-        else:
+        except NoSuchElementException:
             return True
 
 
@@ -271,7 +281,6 @@ class Ticket:
         self.min_time = time_priority_options.min_datetime
         self.max_time = time_priority_options.max_datetime
         self.best_time = time_priority_options.best_datetime
-
         _rows = [row_elem for row_elem in table_elem.find_elements(By.TAG_NAME, "tr")]
         _time_table_df = self._get_time_table_df(_rows)
         self._sorted_by_time_df = self._filter_by_time(_time_table_df)
@@ -432,7 +441,22 @@ class AutoReserver(BasePage):
                     break
 
     def _get_tickets(self) -> Ticket:
-        table_elem = self._driver.find_element(By.XPATH, self._table_body_xpath)
+        try:
+            table_elem = self._driver.find_element(By.XPATH, self._table_body_xpath)
+        except NoSuchElementException:
+            search_button = self._driver.find_element(By.XPATH, "//*[@id=\"search_top_tag\"]/input")
+            search_button.click()
+            try:
+                popup_xpath = "//*[@id=\"NetFunnel_Loading_Popup\"]"
+                WebDriverWait(driver, POP_UP_VISIBLE_EXPLICIT_WAIT_TIME).until(
+                    EC.presence_of_element_located((By.XPATH, popup_xpath))
+                )
+                WebDriverWait(driver, POP_UP_INVISIBLE_EXPLICIT_WAIT_TIME).until(
+                    EC.invisibility_of_element((By.XPATH, popup_xpath))
+                )
+            except:
+                pass
+            table_elem = self._driver.find_element(By.XPATH, self._table_body_xpath)
         tickets = Ticket(table_elem, self._class_priority_options, self._time_priority_options)
         return tickets
 
@@ -455,8 +479,8 @@ if __name__ == "__main__":
 
     departure: Region = "수서"
     destination: Region = "대전"
-    # min_datetime = datetime.datetime(2024, 7, 21, 18)
-    min_datetime = datetime.datetime.now()
+    min_datetime = datetime.datetime(2024, 7, 22, 5)
+    # min_datetime = datetime.datetime.now()
     max_datetime = (min_datetime + datetime.timedelta(hours=3))
     # best_datetime = min_datetime.replace(hour=22, minute=0)
     # max_datetime = (min_datetime + datetime.timedelta(hours=5, minutes=40))
@@ -467,8 +491,8 @@ if __name__ == "__main__":
     select_schedule_page.select_passenger(passenger_cnt)
     select_schedule_page.select_seat_type(SeatLocation.default, SeatAttribute.default)
     select_schedule_page.search()
-    priority_options = ClassPriorityOptions(standard=HIGH,
-                                            first_class=DISABLE,
+    priority_options = ClassPriorityOptions(standard=MEDIUM,
+                                            first_class=HIGH,
                                             standard_standing=DISABLE,
                                             first_class_standing=DISABLE,
                                             allow_standing=False,
@@ -487,6 +511,6 @@ if __name__ == "__main__":
     is_success = ticketing_page.validate()
     print(is_success)
 
-    # TODO: 입석옵션좀 고민해보자..
+    # TODO: 
     input("Press Enter to close the browser and end the script...")
     print("Done")

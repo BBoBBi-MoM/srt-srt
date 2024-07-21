@@ -247,6 +247,7 @@ class TimePriorityOptions:
     min_datetime: datetime.datetime = datetime.datetime.now()
     max_datetime: datetime.datetime | None = None
     best_datetime: datetime.datetime | None = None
+    prefer_time: bool = False
     ascendig: bool = True
 
     def __post_init__(self):
@@ -266,7 +267,7 @@ class Ticket:
     STANDARD_CLS_IDX = 6
 
     def __init__(self, table_elem: WebElement, class_priority_options: ClassPriorityOptions,
-                 time_priority_options: TimePriorityOptions, prefer_time: bool = True):
+                 time_priority_options: TimePriorityOptions):
         self._class_priority_options = class_priority_options
         self._time_priority_options = time_priority_options
         self.min_time = time_priority_options.min_datetime
@@ -278,7 +279,6 @@ class Ticket:
         self._sorted_by_time_df = self._filter_by_time(_time_table_df)
         self._standard, self._standard_standing, self._first_class, self._first_class_standing = \
             self._split_by_class(self._sorted_by_time_df)
-        # self._all = pd.concat([getattr(self, p) for p in class_priority_options], axis=0, ignore_index=True)
 
     def __bool__(self):
         return not (
@@ -319,14 +319,6 @@ class Ticket:
             max_time_filterd = time_series <= self._time_priority_options.max_datetime
             time_filter = time_filter & max_time_filterd
         time_table_df = time_table_df[time_filter]
-        # if self._time_priority_options.best_datetime:
-        #     time_table_df["time_diff"] = time_table_df[Ticket.DEP_IDX].apply(
-        #         lambda t: t - self._time_priority_options.best_datetime)
-        #     time_table_df = time_table_df.iloc[(time_table_df['time_diff'].abs()).argsort()]
-        #     time_table_df = time_table_df.drop(columns=["time_diff"])
-        #     return time_table_df
-        # if not time_priority_options.ascendig:
-        #     return time_table_df.iloc[::-1]
         return time_table_df
 
     def _split_by_class(self, time_table_df: pd.DataFrame) -> tuple[pd.DataFrame, ...]:
@@ -382,23 +374,32 @@ class Ticket:
     def first_class_standing(self) -> pd.DataFrame:
         return self._first_class_standing
 
-    def sorted_by_priority(self, prefer_time: bool) -> ...:
-        if prefer_time:  # 오직 시간만을
+    def sorted_by_priority(self) -> pd.DataFrame:
+        if self._time_priority_options.prefer_time:  # 오직 시간만을
             all_df = pd.concat([self.standard, self.standard_standing, self.first_class, self.first_class_standing],
                                axis=0)
             if self._time_priority_options.best_datetime:  # 오직 베스트 타임과 가까울수록
-                all_df["time_diff"] = all_df["ticket"].apply(lambda t: t - self._time_priority_options.best_datetime)
-                all_df = all_df.iloc[(all_df['time_diff'].abs()).argsort()]
-                all_df = all_df.drop(columns=["time_diff"])
-                return all_df
+                return self._sort_by_best_time(all_df)
             else:  # 객실 유형 무시하고 오름차순 or 내림차순으로만 정렬
                 return all_df.sort_values("time", ascending=self._time_priority_options.ascendig)
         else:  # 객실 유형별로 시간정렬 한 후에 객실 유형 우선순위맞춰서 합쳐야함
-            tickets_list = [getattr(self, p) for p in self._class_priority_options]
-            if self._time_priority_options.ascendig:
-                ...
-            # return pd.concat([getattr(self, p) for p in self._class_priority_options], axis=0, ignore_index=True)
+            tickets_list: list[pd.DataFrame] = [getattr(self, p) for p in self._class_priority_options]
+            if self._time_priority_options.best_datetime:
+                for ticket in tickets_list:
+                    ticket = self._sort_by_best_time(ticket)
+                return pd.concat(tickets_list, axis=0)
+            else:
+                all_df = pd.concat(tickets_list, axis=0)
+                all_df.sort_values("time", ascending=self._time_priority_options.ascendig) 
+                return all_df
 
+    def _sort_by_best_time(self, df: pd.DataFrame) -> pd.DataFrame:
+        if df.empty:
+            return df
+        df["time_diff"] = df["time"].apply(lambda t: t - self._time_priority_options.best_datetime)
+        df = df.iloc[(df['time_diff'].abs()).argsort()]
+        df = df.drop(columns=["time_diff"])
+        return df
 
 
 class AutoReserver:
@@ -409,7 +410,7 @@ class AutoReserver:
         _table_body_xpath = "//tbody"
         _tbody_elem = self._driver.find_element(By.XPATH, _table_body_xpath)
         self._tickets = Ticket(_tbody_elem, class_priority_options, time_priority_options)
-        self._sorted_ticket = self._tickets.sorted_by_priority(True)
+        self._sorted_ticket = self._tickets.sorted_by_priority()
         ...
 
     def run(self):
@@ -453,7 +454,8 @@ if __name__ == "__main__":
     time_priority_options = TimePriorityOptions(
         min_datetime=min_datetime,
         max_datetime=max_datetime,
-        # best_datetime=best_datetime,
+        best_datetime=best_datetime,
+        prefer_time=False,
         ascendig=False)
 
     auto_reserver = AutoReserver(driver, class_priority_options=priority_options,

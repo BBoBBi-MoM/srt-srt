@@ -7,11 +7,16 @@ from typing import Generic, Iterator, Literal, TypeVar, get_args
 
 import pandas as pd
 from dotenv import load_dotenv
+from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import Select as SeleniumSelect
+import time
+
 
 T = TypeVar("T")
 VERY_HIGH: int = 4
@@ -21,6 +26,7 @@ LOW: int = 1
 DISABLE: int = 0
 SRT_LOGIN_PAGE_URL = r"https://etk.srail.kr/cmc/01/selectLoginForm.do?pageId=TK0701000000"
 SRT_SELECT_SCHEDULE_PAGE_URL = r"https://etk.srail.kr/hpg/hra/01/selectScheduleList.do?pageId=TK0101010000"
+SRT_TICKETING_PAGE_URL = r"https://etk.srail.kr/hpg/hra/02/selectReservationList.do?pageId=TK0102010000"
 SRT_MAIN_URL = r"https://etk.srail.kr/main.do"
 Region = Literal["수서", "동탄", "평택지제", "천안아산", "오송", "대전", "김천구미", "동대구", "서대구", "경주", "울산(통도사)", "울산", "부산"]
 
@@ -35,39 +41,11 @@ class Select(SeleniumSelect):
         return [elem.text for elem in self.options]
 
 
-# class BaseColumn(ABC):
-#     def __init__(self, col_elems: list[WebElement]):
-#         self._col_elems = col_elems
-
-#     @property
-#     def text(self) -> list[str]:
-#         return [elem.text for elem in self._col_elems]
-
-
-# class TimeColumn(BaseColumn):
-#     @property
-#     def time(self) -> list[datetime.time]:
-#         times = []
-#         for text in self.text:
-#             time_str = text.split("\n")[1]
-#             time_obj = datetime.datetime.strptime(time_str, "%H:%M").time()
-#             times.append(time_obj)
-#         return times
-
-
-# class ClassColumn(BaseColumn):
-#     @property
-#     def is_available(self) -> list[bool]:
-#         ...
-
-
 class BasePage(ABC):
-    def __init__(self, driver: Chrome, url: str):
+    def __init__(self, driver: Chrome):
         self._driver = driver
         self._driver.implicitly_wait(10)
-        self._driver.get(url)
 
-    @property
     def is_alert_present(self) -> bool:
         try:
             _ = self._driver.switch_to.alert
@@ -114,15 +92,15 @@ class SeatLocation(IntEnum):
 
 
 class SeatAttribute(IntEnum):
-    default = 0
-    normal = 1
+    default = 1
     wheelchair = 2
     electric_wheelchair = 3
 
 
 class LoginPage(BasePage):
     def __init__(self, driver: Chrome, url: str = SRT_LOGIN_PAGE_URL):
-        BasePage.__init__(self, driver, url)
+        BasePage.__init__(self, driver)
+        self._driver.get(url)
         _id_input_box_xpath = "//*[@id='srchDvNm01']"
         self._id_input_box = self._driver.find_element(By.XPATH, _id_input_box_xpath)
         _pw_input_box_xpath = "//*[@id='hmpgPwdCphd01']"
@@ -136,7 +114,7 @@ class LoginPage(BasePage):
         self._pw_input_box.send_keys(pw)
         self._id_input_box.send_keys(account_id)
         self._confirm_button.click()
-        if self.is_alert_present:
+        if self.is_alert_present():
             alert_msg = self._driver.switch_to.alert.text
             raise ValueError(alert_msg)
         else:
@@ -145,7 +123,8 @@ class LoginPage(BasePage):
 
 class SelectSchedulePage(BasePage):
     def __init__(self, driver: Chrome, url: str = SRT_SELECT_SCHEDULE_PAGE_URL):
-        BasePage.__init__(self, driver, url)
+        BasePage.__init__(self, driver)
+        self._driver.get(url)
         _dep_input_box_xpath = "//*[@id='dptRsStnCdNm']"
         self._dep_input_box = self._driver.find_element(By.XPATH, _dep_input_box_xpath)
         self._dep_input_box.clear()
@@ -212,7 +191,13 @@ class SelectSchedulePage(BasePage):
 
     def search(self):
         self._search_button.click()
-
+        popup_xpath = "//*[@id=\"NetFunnel_Loading_Popup\"]"
+        print("ㅋ")
+        try:
+            self._driver.find_element(By.XPATH, popup_xpath)
+            time.sleep(10)
+        except NoSuchElementException:
+            ...
 
 @dataclass
 class ClassPriorityOptions:
@@ -261,6 +246,19 @@ class TimePriorityOptions:
                     raise ValueError
 
 
+class TicketingPage(BasePage):
+    def __init__(self, driver: Chrome, url: str = SRT_SELECT_SCHEDULE_PAGE_URL):
+        BasePage.__init__(self, driver)
+        self._driver.get(url)
+
+    def validate(self):
+        status_msg = self._driver.find_element(By.XPATH, "//*[@id=\"list-form\"]/fieldset/div[2]").text
+        if status_msg == "예약된 내역이 없습니다":
+            return False
+        else:
+            return True
+
+
 class Ticket:
     DEP_IDX = 3
     FIRST_CLS_IDX = 5
@@ -280,12 +278,12 @@ class Ticket:
         self._standard, self._standard_standing, self._first_class, self._first_class_standing = \
             self._split_by_class(self._sorted_by_time_df)
 
-    def __bool__(self):
-        return not (
-            self._standard.empty and
-            self._standard_standing.empty and
-            self._first_class.empty and
-            self._first_class_standing.empty
+    def is_empty(self):
+        return (
+            self.standard.empty and
+            self.standard_standing.empty and
+            self.first_class.empty and
+            self.first_class_standing.empty
         )
 
     def _get_time_table_df(self, rows: list[WebElement]) -> pd.DataFrame:
@@ -315,7 +313,7 @@ class Ticket:
         _20_minutes = (datetime.datetime.now() + datetime.timedelta(minutes=20))
         _20_min_filter = time_series > _20_minutes
         time_filter = time_filter & _20_min_filter
-        if self._time_priority_options.min_datetime is not None:
+        if self._time_priority_options.max_datetime is not None:
             max_time_filterd = time_series <= self._time_priority_options.max_datetime
             time_filter = time_filter & max_time_filterd
         time_table_df = time_table_df[time_filter]
@@ -352,10 +350,14 @@ class Ticket:
         else:
             first_class = pd.DataFrame()
             first_class_standing = pd.DataFrame()
-        standard.columns = ['time', 'ticket']
-        standard_standing.columns = ['time', 'ticket']
-        first_class.columns = ['time', 'ticket']
-        first_class_standing.columns = ['time', 'ticket']
+        if not standard.empty:
+            standard.columns = ['time', 'ticket']
+        if not standard_standing.empty:
+            standard_standing.columns = ['time', 'ticket']
+        if not first_class.empty:
+            first_class.columns = ['time', 'ticket']
+        if not first_class_standing.empty:
+            first_class_standing.columns = ['time', 'ticket']
         return standard, standard_standing, first_class, first_class_standing
 
     @property
@@ -387,10 +389,10 @@ class Ticket:
             if self._time_priority_options.best_datetime:
                 for ticket in tickets_list:
                     ticket = self._sort_by_best_time(ticket)
-                return pd.concat(tickets_list, axis=0)
+                return pd.concat(tickets_list, axis=0).drop(columns=["time_diff"])
             else:
                 all_df = pd.concat(tickets_list, axis=0)
-                all_df.sort_values("time", ascending=self._time_priority_options.ascendig) 
+                all_df.sort_values("time", ascending=self._time_priority_options.ascendig)
                 return all_df
 
     def _sort_by_best_time(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -402,19 +404,37 @@ class Ticket:
         return df
 
 
-class AutoReserver:
+class AutoReserver(BasePage):
     def __init__(self, driver: Chrome,
                  class_priority_options: ClassPriorityOptions, time_priority_options: TimePriorityOptions,
                  ):
         self._driver = driver
-        _table_body_xpath = "//tbody"
-        _tbody_elem = self._driver.find_element(By.XPATH, _table_body_xpath)
-        self._tickets = Ticket(_tbody_elem, class_priority_options, time_priority_options)
-        self._sorted_ticket = self._tickets.sorted_by_priority()
-        ...
+        self._class_priority_options = class_priority_options
+        self._time_priority_options = time_priority_options
+        self._table_body_xpath = "//tbody"
+        self._ticking_page = TicketingPage(self._driver)
 
-    def run(self):
-        ...
+    def run(self, refresh_cycle_sec: float = 0.5):
+        while True:
+            tickets = self._get_tickets()
+            if tickets.is_empty():
+                self._driver.refresh()
+                time.sleep(refresh_cycle_sec)
+            else:
+                sorted_ticket = tickets.sorted_by_priority()
+                best_ticket: WebElement = sorted_ticket["ticket"].iloc[0]
+                reservation_button = best_ticket.find_element(By.TAG_NAME, "a")
+                reservation_button.click()
+                if self.is_alert_present():
+                    alert = self._driver.switch_to.alert
+                    alert.accept()
+                if self._ticking_page.validate():
+                    break
+
+    def _get_tickets(self) -> Ticket:
+        table_elem = self._driver.find_element(By.XPATH, self._table_body_xpath)
+        tickets = Ticket(table_elem, self._class_priority_options, self._time_priority_options)
+        return tickets
 
 
 if __name__ == "__main__":
@@ -434,10 +454,12 @@ if __name__ == "__main__":
     login_page.login(ID, PW)
 
     departure: Region = "수서"
-    destination: Region = "부산"
-    min_datetime = datetime.datetime(2024, 7, 22, 21)
-    best_datetime = min_datetime.replace(hour=22, minute=0)
-    max_datetime = (min_datetime + datetime.timedelta(hours=5, minutes=40))
+    destination: Region = "대전"
+    # min_datetime = datetime.datetime(2024, 7, 21, 18)
+    min_datetime = datetime.datetime.now()
+    max_datetime = (min_datetime + datetime.timedelta(hours=3))
+    # best_datetime = min_datetime.replace(hour=22, minute=0)
+    # max_datetime = (min_datetime + datetime.timedelta(hours=5, minutes=40))
     passenger_cnt = PassengerCount()
     select_schedule_page = SelectSchedulePage(driver)
     select_schedule_page.enter_region(departure, destination)
@@ -445,21 +467,25 @@ if __name__ == "__main__":
     select_schedule_page.select_passenger(passenger_cnt)
     select_schedule_page.select_seat_type(SeatLocation.default, SeatAttribute.default)
     select_schedule_page.search()
-    priority_options = ClassPriorityOptions(standard=LOW,
-                                            first_class=VERY_HIGH,
-                                            standard_standing=MEDIUM,
-                                            first_class_standing=HIGH,
-                                            allow_standing=True,
+    priority_options = ClassPriorityOptions(standard=HIGH,
+                                            first_class=DISABLE,
+                                            standard_standing=DISABLE,
+                                            first_class_standing=DISABLE,
+                                            allow_standing=False,
                                             )
     time_priority_options = TimePriorityOptions(
         min_datetime=min_datetime,
         max_datetime=max_datetime,
-        best_datetime=best_datetime,
+        # best_datetime=best_datetime,
         prefer_time=False,
         ascendig=False)
 
     auto_reserver = AutoReserver(driver, class_priority_options=priority_options,
                                  time_priority_options=time_priority_options)  # , time_limit=max_time)
+    ticketing_page = TicketingPage(driver)
+    auto_reserver.run()
+    is_success = ticketing_page.validate()
+    print(is_success)
 
     # TODO: 입석옵션좀 고민해보자..
     input("Press Enter to close the browser and end the script...")

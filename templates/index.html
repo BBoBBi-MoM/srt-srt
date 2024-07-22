@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>데이터 입력</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 1rem 0;
+        }
+        main {
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 1rem;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        input, textarea, select {
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+        button {
+            padding: 0.5rem;
+            font-size: 1rem;
+            background-color: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Speedy Reserve To Speed Rapid Train</h1>
+    </header>
+    <main>
+        <div class="container">
+            <form action="/result" method="post">
+                <label for="name">회원번호:</label>
+                <input type="text" id="name" name="name" required>
+
+                <label for="age">비밀번호:</label>
+                <input type="text" id="age" name="age" required>
+
+                <label for="departure">출발역:</label>
+                <select id="departure" name="departure" required>
+                    <option value="수서">수서</option>
+                    <option value="동탄">동탄</option>
+                    <option value="평택지제">평택지제</option>
+                    <option value="천안아산">천안아산</option>
+                    <option value="오송">오송</option>
+                    <option value="대전">대전</option>
+                    <option value="김천구미">김천구미</option>
+                    <option value="동대구">동대구</option>
+                    <option value="서대구">서대구</option>
+                    <option value="경주">경주</option>
+                    <option value="울산(통도사)">울산(통도사)</option>
+                    <option value="울산">울산</option>
+                    <option value="부산">부산</option>
+                </select>
+                
+                <label for="destination">도착역:</label>
+                <select id="destination" name="destination" required>
+                    <option value="수서">수서</option>
+                    <option value="동탄">동탄</option>
+                    <option value="평택지제">평택지제</option>
+                    <option value="천안아산">천안아산</option>
+                    <option value="오송">오송</option>
+                    <option value="대전">대전</option>
+                    <option value="김천구미">김천구미</option>
+                    <option value="동대구">동대구</option>
+                    <option value="서대구">서대구</option>
+                    <option value="경주">경주</option>
+                    <option value="울산(통도사)">울산(통도사)</option>
+                    <option value="울산">울산</option>
+                    <option value="부산">부산</option>
+                </select>
+
+
+                <button type="submit">제출</button>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

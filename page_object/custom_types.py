@@ -8,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import Select as SeleniumSelect
 
+
 T = TypeVar("T")
 
 VERY_HIGH: int = 4
@@ -69,6 +70,12 @@ class SeatAttribute(IntEnum):
 
 
 @dataclass
+class SeatOptions:
+    seat_location: SeatLocation
+    seat_attribute: SeatAttribute
+
+
+@dataclass
 class ClassPriorityOptions:
     standard: int = HIGH
     first_class: int = LOW
@@ -113,6 +120,11 @@ class TimePriorityOptions:
             if self.max_datetime is not None:
                 if self.best_datetime > self.max_datetime:
                     raise ValueError
+
+@dataclass
+class PriorityOptions:
+    class_priority_option: ClassPriorityOptions
+    time_priority_option: TimePriorityOptions
 
 
 class Ticket:

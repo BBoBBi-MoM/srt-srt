@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>결과 페이지</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 1rem 0;
+        }
+        main {
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 1rem;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+        }
+        th, td {
+            padding: 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid #ccc;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>승차권 예약 결과</h1>
+    </header>
+    <main>
+        <div class="container">
+            <h2>예약 정보</h2>
+            <table>
+                <tr>
+                    <th>출발역</th>
+                    <td>{{ departure }}</td>
+                </tr>
+                <tr>
+                    <th>도착역</th>
+                    <td>{{ destination }}</td>
+                </tr>
+                <tr>
+                    <th>예매하고픈 가장 빠른 시간</th>
+                    <td>{{ min_time }}</td>
+                </tr>
+                <tr>
+                    <th>예매하고픈 가장 늦은 시간</th>
+                    <td>{{ max_time }}</td>
+                </tr>
+                <tr>
+                    <th>가장 원하는 시간</th>
+                    <td>{{ best_time }}</td>
+                </tr>
+                <tr>
+                    <th>여정경로</th>
+                    <td>{{ route }}</td>
+                </tr>
+                <tr>
+                    <th>어른(만 13세 이상)</th>
+                    <td>{{ adult_count }}</td>
+                </tr>
+                <tr>
+                    <th>어린이(만 6~12세)</th>
+                    <td>{{ child_count }}</td>
+                </tr>
+                <tr>
+                    <th>경로(만 65세 이상)</th>
+                    <td>{{ senior_count }}</td>
+                </tr>
+                <tr>
+                    <th>중증장애인</th>
+                    <td>{{ severe_disabled_count }}</td>
+                </tr>
+                <tr>
+                    <th>경증장애인</th>
+                    <td>{{ mild_disabled_count }}</td>
+                </tr>
+                <tr>
+                    <th>좌석종류</th>
+                    <td>{{ seat }}</td>
+                </tr>
+                <tr>
+                    <th>차종구분</th>
+                    <td>{{ train_type }}</td>
+                </tr>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

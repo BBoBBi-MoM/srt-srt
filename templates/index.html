@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>데이터 입력</title>
+    <title>승차권 예약</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -21,7 +21,7 @@
             padding: 2rem;
         }
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             background-color: white;
             padding: 1rem;
@@ -31,10 +31,18 @@
             display: flex;
             flex-direction: column;
         }
-        input, textarea, select {
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        input, select {
             margin-bottom: 1rem;
             padding: 0.5rem;
             font-size: 1rem;
+            width: 100%;
         }
         button {
             padding: 0.5rem;
@@ -44,56 +52,177 @@
             border: none;
             cursor: pointer;
         }
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+        .input-group > input {
+            flex: 1;
+            margin-right: 0.5rem;
+        }
+        .form-section {
+            margin-bottom: 1rem;
+        }
+        .form-section h2 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+        .inline-group {
+            display: flex;
+            align-items: center;
+        }
+        .inline-group > * {
+            flex: 1;
+            margin-right: 1rem;
+        }
+        .inline-group > *:last-child {
+            margin-right: 0;
+        }
     </style>
+    <script src="/static/script.js" defer></script>
 </head>
 <body>
     <header>
-        <h1>Speedy Reserve To Speed Rapid Train</h1>
+        <h1>Speedily Reserve The Speed Rapid Train</h1>
     </header>
     <main>
         <div class="container">
-            <form action="/result" method="post">
-                <label for="name">회원번호:</label>
-                <input type="text" id="name" name="name" required>
-
-                <label for="age">비밀번호:</label>
-                <input type="text" id="age" name="age" required>
-
-                <label for="departure">출발역:</label>
-                <select id="departure" name="departure" required>
-                    <option value="수서">수서</option>
-                    <option value="동탄">동탄</option>
-                    <option value="평택지제">평택지제</option>
-                    <option value="천안아산">천안아산</option>
-                    <option value="오송">오송</option>
-                    <option value="대전">대전</option>
-                    <option value="김천구미">김천구미</option>
-                    <option value="동대구">동대구</option>
-                    <option value="서대구">서대구</option>
-                    <option value="경주">경주</option>
-                    <option value="울산(통도사)">울산(통도사)</option>
-                    <option value="울산">울산</option>
-                    <option value="부산">부산</option>
-                </select>
-                
-                <label for="destination">도착역:</label>
-                <select id="destination" name="destination" required>
-                    <option value="수서">수서</option>
-                    <option value="동탄">동탄</option>
-                    <option value="평택지제">평택지제</option>
-                    <option value="천안아산">천안아산</option>
-                    <option value="오송">오송</option>
-                    <option value="대전">대전</option>
-                    <option value="김천구미">김천구미</option>
-                    <option value="동대구">동대구</option>
-                    <option value="서대구">서대구</option>
-                    <option value="경주">경주</option>
-                    <option value="울산(통도사)">울산(통도사)</option>
-                    <option value="울산">울산</option>
-                    <option value="부산">부산</option>
-                </select>
-
-
+            <form action="/submit" method="post">
+                <div class="form-section">
+                    <h2>사용자 정보</h2>
+                    <div class="form-group">
+                        <label for="id">아이디:</label>
+                        <input type="text" id="id" name="id" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">비밀번호:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <h2>여행 정보</h2>
+                    <div class="form-group">
+                        <label for="departure">출발역:</label>
+                        <select id="departure" name="departure" required>
+                            <option value="수서">수서</option>
+                            <option value="동탄">동탄</option>
+                            <option value="평택지제">평택지제</option>
+                            <option value="천안아산">천안아산</option>
+                            <option value="오송">오송</option>
+                            <option value="대전">대전</option>
+                            <option value="김천구미">김천구미</option>
+                            <option value="동대구">동대구</option>
+                            <option value="서대구">서대구</option>
+                            <option value="경주">경주</option>
+                            <option value="울산(통도사)">울산(통도사)</option>
+                            <option value="울산">울산</option>
+                            <option value="부산">부산</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="destination">도착역:</label>
+                        <select id="destination" name="destination" required>
+                            <option value="수서">수서</option>
+                            <option value="동탄">동탄</option>
+                            <option value="평택지제">평택지제</option>
+                            <option value="천안아산">천안아산</option>
+                            <option value="오송">오송</option>
+                            <option value="대전">대전</option>
+                            <option value="김천구미">김천구미</option>
+                            <option value="동대구">동대구</option>
+                            <option value="서대구">서대구</option>
+                            <option value="경주">경주</option>
+                            <option value="울산(통도사)">울산(통도사)</option>
+                            <option value="울산">울산</option>
+                            <option value="부산">부산</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>날짜와 시간:</label>
+                        <div class="inline-group">
+                            <input type="datetime-local" id="min_time" name="min_time" required>
+                            <input type="datetime-local" id="max_time" name="max_time" required>
+                        </div>
+                        <label for="best_time">가장 원하는 시간 (이 시간에서 가장 가까운걸로 잡음):</label>
+                        <input type="datetime-local" id="best_time" name="best_time">
+                    </div>
+                    <div class="form-group">
+                        <label for="route">여정경로:</label>
+                        <div>
+                            <label><input type="radio" name="route" value="직통" checked> 직통</label>
+                            <label><input type="radio" name="route" value="환승"> 환승</label>
+                            <label><input type="radio" name="route" value="왕복"> 왕복</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="passenger">인원정보:</label>
+                        <div>
+                            <label>어른(만 13세 이상)
+                                <select name="adult_count">
+                                    <option value="0">0명</option>
+                                    <option value="1">1명</option>
+                                    <option value="2">2명</option>
+                                    <option value="3">3명</option>
+                                    <option value="4">4명</option>
+                                </select>
+                            </label>
+                            <label>어린이(만 6~12세)
+                                <select name="child_count">
+                                    <option value="0">0명</option>
+                                    <option value="1">1명</option>
+                                    <option value="2">2명</option>
+                                    <option value="3">3명</option>
+                                    <option value="4">4명</option>
+                                </select>
+                            </label>
+                            <label>경로(만 65세 이상)
+                                <select name="senior_count">
+                                    <option value="0">0명</option>
+                                    <option value="1">1명</option>
+                                    <option value="2">2명</option>
+                                    <option value="3">3명</option>
+                                    <option value="4">4명</option>
+                                </select>
+                            </label>
+                            <label>중증장애인
+                                <select name="severe_disabled_count">
+                                    <option value="0">0명</option>
+                                    <option value="1">1명</option>
+                                    <option value="2">2명</option>
+                                    <option value="3">3명</option>
+                                    <option value="4">4명</option>
+                                </select>
+                            </label>
+                            <label>경증장애인
+                                <select name="mild_disabled_count">
+                                    <option value="0">0명</option>
+                                    <option value="1">1명</option>
+                                    <option value="2">2명</option>
+                                    <option value="3">3명</option>
+                                    <option value="4">4명</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="seat">좌석종류:</label>
+                        <div>
+                            <select id="seat" name="seat" required>
+                                <option value="일반">일반</option>
+                                <option value="우등">우등</option>
+                                <option value="특실">특실</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="train_type">차종구분:</label>
+                        <div>
+                            <label><input type="radio" name="train_type" value="전체" checked> 전체</label>
+                            <label><input type="radio" name="train_type" value="SRT"> SRT</label>
+                            <label><input type="radio" name="train_type" value="SRT + KTX"> SRT + KTX</label>
+                        </div>
+                    </div>
+                </div>
                 <button type="submit">제출</button>
             </form>
         </div>

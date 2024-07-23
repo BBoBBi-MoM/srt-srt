@@ -42,7 +42,7 @@ class BasePage(ABC):
 class LoginPage(BasePage):
     def __init__(self, driver: Chrome, url: str = SRT_LOGIN_PAGE_URL):
         BasePage.__init__(self, driver)
-        self._driver.get(url)
+        self._url = url
         _id_input_box_xpath = "//*[@id='srchDvNm01']"
         self._id_input_box = self._driver.find_element(By.XPATH, _id_input_box_xpath)
         _pw_input_box_xpath = "//*[@id='hmpgPwdCphd01']"
@@ -51,6 +51,7 @@ class LoginPage(BasePage):
         self._confirm_button = self._driver.find_element(By.XPATH, _confirm_button_xpath)
 
     def login(self, account_id: str, pw: str):
+        self._driver.get(self._url)
         if len(account_id) != 10 or not account_id.isdigit():
             raise ValueError
         self._pw_input_box.send_keys(pw)
@@ -66,7 +67,7 @@ class LoginPage(BasePage):
 class SelectSchedulePage(BasePage):
     def __init__(self, driver: Chrome, url: str = SRT_SELECT_SCHEDULE_PAGE_URL):
         BasePage.__init__(self, driver)
-        self._driver.get(url)
+        self._url = url
         _dep_input_box_xpath = "//*[@id='dptRsStnCdNm']"
         self._dep_input_box = self._driver.find_element(By.XPATH, _dep_input_box_xpath)
         self._dep_input_box.clear()
@@ -100,6 +101,7 @@ class SelectSchedulePage(BasePage):
         self._search_button = self._driver.find_element(By.XPATH, _search_button_xpath)
 
     def enter_region(self, dep: Region, dst: Region):
+        self._driver.get(self._url)
         if dep not in get_args(Region) or dst not in get_args(Region):
             ValueError("지역 이상함;")
         self._dep_input_box.send_keys(dep)
@@ -148,19 +150,15 @@ class SelectSchedulePage(BasePage):
             pass
 
 
-class AutoReserver(BasePage):
-    def __init__(self, driver: Chrome,
-                 class_priority_options: ClassPriorityOptions, time_priority_options: TimePriorityOptions,
-                 ):
+class TimeTablePage(BasePage):
+    def __init__(self, driver: Chrome):
         self._driver = driver
-        self._class_priority_options = class_priority_options
-        self._time_priority_options = time_priority_options
         self._table_body_xpath = "//tbody"
         self._ticking_page = TicketingPage(self._driver)
 
-    def run(self, refresh_cycle_sec: float = 0.5):
+    def run(self, refresh_cycle_sec: float = 0.5, class_priority_options: ClassPriorityOptions, time_priority_options: TimePriorityOptions):
         while True:
-            tickets = self._get_tickets()
+            tickets = self._get_tickets(class_priority_options, time_priority_options)
             if tickets.is_empty():
                 self._driver.refresh()
                 time.sleep(refresh_cycle_sec)
@@ -175,7 +173,7 @@ class AutoReserver(BasePage):
                 if self._ticking_page.validate():
                     break
 
-    def _get_tickets(self) -> Ticket:
+    def _get_tickets(self, class_priority_options: ClassPriorityOptions, time_priority_options: TimePriorityOptions) -> Ticket:
         try:
             table_elem = self._driver.find_element(By.XPATH, self._table_body_xpath)
         except NoSuchElementException:
@@ -192,7 +190,7 @@ class AutoReserver(BasePage):
             except BaseException:
                 pass
             table_elem = self._driver.find_element(By.XPATH, self._table_body_xpath)
-        tickets = Ticket(table_elem, self._class_priority_options, self._time_priority_options)
+        tickets = Ticket(table_elem, class_priority_options, time_priority_options)
         return tickets
 
 

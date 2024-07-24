@@ -13,11 +13,6 @@ from selenium.webdriver.chrome.options import Options
 import time
 
 
-
-
-
-
-
 if __name__ == "__main__":
     load_dotenv()
     ID = os.getenv("ID")
@@ -68,6 +63,6 @@ if __name__ == "__main__":
     is_success = ticketing_page.validate()
     print(is_success)
 
-    # TODO: 
+    # TODO:
     input("Press Enter to close the browser and end the script...")
     print("Done")

@@ -20,6 +20,12 @@ DISABLE: int = 0
 Region = Literal["수서", "동탄", "평택지제", "천안아산", "오송", "대전", "김천구미", "동대구", "서대구", "경주", "울산(통도사)", "울산", "부산"]
 
 
+@dataclass
+class RegionOptions:
+    departure: Region
+    destination: Region
+
+
 class Select(SeleniumSelect):
     @property
     def elem_options(self) -> list[WebElement]:
@@ -48,7 +54,7 @@ class PassengerSelect(Passenger[Select]):
 
 
 @dataclass
-class PassengerCount(Passenger[int]):
+class PassengerOptions(Passenger[int]):
     adult: int = field(default=1)
     elder: int = field(default=0)
     child: int = field(default=0)
@@ -120,6 +126,7 @@ class TimePriorityOptions:
             if self.max_datetime is not None:
                 if self.best_datetime > self.max_datetime:
                     raise ValueError
+
 
 @dataclass
 class PriorityOptions:

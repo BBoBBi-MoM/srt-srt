@@ -4,7 +4,7 @@ from abc import ABC
 from dataclasses import fields
 from typing import get_args
 
-from custom_types import (ClassPriorityOptions, Passenger, PassengerCount,
+from custom_types import (ClassPriorityOptions, Passenger, PassengerOptions,
                           PassengerSelect, Region, SeatAttribute, SeatLocation,
                           Select, Ticket, TimePriorityOptions)
 from selenium.common.exceptions import NoSuchElementException
@@ -120,7 +120,7 @@ class SelectSchedulePage(BasePage):
         time_idx = time_list.index(f"{dep_time:02d}")
         self._time_select.select_by_index(time_idx)
 
-    def select_passenger(self, pessanger_count: PassengerCount) -> None:
+    def select_passenger(self, pessanger_count: PassengerOptions) -> None:
         for f in fields(Passenger):
             cnt: int = getattr(pessanger_count, f.name)
             if cnt > 9:
@@ -156,7 +156,8 @@ class TimeTablePage(BasePage):
         self._table_body_xpath = "//tbody"
         self._ticking_page = TicketingPage(self._driver)
 
-    def run(self, refresh_cycle_sec: float = 0.5, class_priority_options: ClassPriorityOptions, time_priority_options: TimePriorityOptions):
+    def run(self, class_priority_options: ClassPriorityOptions,
+            time_priority_options: TimePriorityOptions, refresh_cycle_sec: float = 0.5):
         while True:
             tickets = self._get_tickets(class_priority_options, time_priority_options)
             if tickets.is_empty():

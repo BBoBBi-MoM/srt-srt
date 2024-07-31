@@ -1,57 +1,73 @@
-from fastapi import FastAPI, Form
-from fastapi.staticfiles import StaticFiles
-from starlette.responses import HTMLResponse
-from starlette.requests import Request
-from starlette.templating import Jinja2Templates
+import datetime
+import os
+from dataclasses import dataclass, field, fields
+from enum import IntEnum
+from typing import Generic, Iterator, Literal, TypeVar, get_args
 
-app = FastAPI()
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
-
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+import pandas as pd
+from dotenv import load_dotenv
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+import time
 
 
-@app.post("/submit", response_class=HTMLResponse)
-async def submit_form(
-    request: Request,
-    id: str = Form(...),
-    password: str = Form(...),
-    departure: str = Form(...),
-    destination: str = Form(...),
-    min_time: str = Form(...),
-    max_time: str = Form(...),
-    best_time: str = Form(None),
-    route: str = Form(...),
-    adult_count: str = Form(...),
-    child_count: str = Form(...),
-    elder_count: str = Form(...),
-    severe_disabled_count: str = Form(...),
-    mild_disabled_count: str = Form(...),
-    seat: str = Form(...),
-    train_type: str = Form(...)
-):
-    context = {
-        "departure": departure,
-        "destination": destination,
-        "min_time": min_time,
-        "max_time": max_time,
-        "best_time": best_time,
-        "route": route,
-        "adult_count": adult_count,
-        "child_count": child_count,
-        "elder_count": elder_count,
-        "severe_disabled_count": severe_disabled_count,
-        "mild_disabled_count": mild_disabled_count,
-        "seat": seat,
-        "train_type": train_type
-    }
 
-    return templates.TemplateResponse("result.html", {"request": request, **context})
+
+
+
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    load_dotenv()
+    ID = os.getenv("ID")
+    if ID is None:
+        raise OSError
+    PW = os.getenv("PW")
+    if PW is None:
+        raise OSError
+
+    driver_options = Options()
+    # driver_options.add_argument("headless")
+    driver = Chrome(options=driver_options)
+
+    login_page = LoginPage(driver)
+    login_page.login(ID, PW)
+
+    departure: Region = "수서"
+    destination: Region = "대전"
+    min_datetime = datetime.datetime(2024, 7, 22, 5)
+    # min_datetime = datetime.datetime.now()
+    max_datetime = (min_datetime + datetime.timedelta(hours=3))
+    # best_datetime = min_datetime.replace(hour=22, minute=0)
+    # max_datetime = (min_datetime + datetime.timedelta(hours=5, minutes=40))
+    passenger_cnt = PassengerCount()
+    select_schedule_page = SelectSchedulePage(driver)
+    select_schedule_page.enter_region(departure, destination)
+    select_schedule_page.select_date_time(min_datetime)
+    select_schedule_page.select_passenger(passenger_cnt)
+    select_schedule_page.select_seat_type(SeatLocation.default, SeatAttribute.default)
+    select_schedule_page.search()
+    priority_options = ClassPriorityOptions(standard=MEDIUM,
+                                            first_class=HIGH,
+                                            standard_standing=DISABLE,
+                                            first_class_standing=DISABLE,
+                                            allow_standing=False,
+                                            )
+    time_priority_options = TimePriorityOptions(
+        min_datetime=min_datetime,
+        max_datetime=max_datetime,
+        # best_datetime=best_datetime,
+        prefer_time=False,
+        ascendig=False)
+
+    auto_reserver = AutoReserver(driver, class_priority_options=priority_options,
+                                 time_priority_options=time_priority_options)  # , time_limit=max_time)
+    ticketing_page = TicketingPage(driver)
+    auto_reserver.run()
+    is_success = ticketing_page.validate()
+    print(is_success)
+
+    # TODO: 
+    input("Press Enter to close the browser and end the script...")
+    print("Done")
